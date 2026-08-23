@@ -104,8 +104,9 @@
   <button class="btn" id="check-btn" onclick="checkAnswers()" disabled>Check Answers</button>
 </div>
 
+<iframe name="hidden-iframe" style="display:none"></iframe>
 <script>
-const SHEET_URL = "https://script.google.com/macros/s/AKfycbzxB42YBV1JHSaikSYrlY4u4PW1e_PckRG2XH0Y6pPpu53zNmNMXAfWowsV-YyHLEHo/exec";
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbyadXGawgfhgDeE0vW_dZUqKQF22ymYCoEgKlQ2sjTksIlGTiQU7n1ufYldWavKlVSh/exec";
 const EPISODE = 4;
 const GAME_NUMBER = 16;
 const OPEN_DATE = new Date("2026-11-24");
@@ -321,20 +322,28 @@ function dismissPenalty() {
 
 function sendResult(status) {
   const now = new Date();
-  fetch(SHEET_URL, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      email: userEmail,
-      episode: EPISODE,
-      gameNumber: GAME_NUMBER,
-      date: now.toLocaleDateString(),
-      time: now.toLocaleTimeString(),
-      roundsCompleted: ROUNDS.length,
-      totalRounds: ROUNDS.length,
-      status: status
-    })
-  }).catch(err => console.error('Submit error:', err));
+  const payload = JSON.stringify({
+    email: userEmail,
+    episode: EPISODE,
+    gameNumber: GAME_NUMBER,
+    date: now.toLocaleDateString(),
+    time: now.toLocaleTimeString(),
+    roundsCompleted: ROUNDS.length,
+    totalRounds: ROUNDS.length,
+    status: status
+  });
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = SHEET_URL;
+  form.target = 'hidden-iframe';
+  const inp = document.createElement('input');
+  inp.type = 'hidden';
+  inp.name = 'data';
+  inp.value = payload;
+  form.appendChild(inp);
+  document.body.appendChild(form);
+  form.submit();
+  document.body.removeChild(form);
 }
 
 window.onload = function() {
