@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Korean Politics – Episode 1 Game 2</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 16px; }
+  .header { text-align: center; margin-bottom: 16px; }
+  .header h1 { font-size: 1.3em; color: #1a3a5c; }
+  .header h2 { font-size: 0.95em; color: #4a6fa5; font-weight: normal; margin-top: 4px; }
+  .header h3 { font-size: 0.85em; color: #666; font-weight: normal; margin-top: 2px; }
+  .progress { font-size: 0.85em; color: #555; margin-bottom: 12px; }
+  .game-area { width: 100%; max-width: 480px; }
+  .columns { display: flex; gap: 12px; justify-content: center; }
+  .column { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .word-card { background: white; border: 2px solid #c0cfe0; border-radius: 10px; padding: 10px 8px; text-align: center; font-size: 0.9em; cursor: grab; user-select: none; transition: background 0.2s, border-color 0.2s; min-height: 48px; display: flex; align-items: center; justify-content: center; }
+  .word-card:active { cursor: grabbing; }
+  .word-card.dragging { opacity: 0.5; border-color: #4a6fa5; }
+  .word-card.correct { background: #d4edda; border-color: #28a745; color: #155724; cursor: default; }
+  .word-card.incorrect { background: #f8d7da; border-color: #dc3545; }
+  .drop-zone { background: #eaf0fb; border: 2px dashed #a0b8d8; border-radius: 10px; padding: 10px 8px; text-align: center; font-size: 0.9em; min-height: 48px; display: flex; align-items: center; justify-content: center; color: #555; transition: background 0.2s, border-color 0.2s; }
+  .drop-zone.over { background: #d0e4ff; border-color: #4a6fa5; }
+  .drop-zone.filled { background: white; border: 2px solid #c0cfe0; color: #333; }
+  .drop-zone.correct { background: #d4edda; border-color: #28a745; color: #155724; }
+  .drop-zone.incorrect { background: #f8d7da; border-color: #dc3545; }
+  .btn { margin-top: 18px; padding: 12px 32px; font-size: 1em; background: #4a6fa5; color: white; border: none; border-radius: 8px; cursor: pointer; width: 100%; max-width: 480px; }
+  .btn:disabled { background: #aaa; cursor: not-allowed; }
+  .btn:hover:not(:disabled) { background: #3a5f95; }
+  .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+  .overlay.show { display: flex; }
+  .modal { background: white; border-radius: 16px; padding: 32px 24px; text-align: center; max-width: 320px; width: 90%; }
+  .modal h2 { font-size: 1.4em; margin-bottom: 12px; }
+  .modal p { color: #555; margin-bottom: 20px; font-size: 0.95em; }
+  .modal .btn { margin-top: 0; }
+  .email-form input { width: 100%; padding: 10px; border: 2px solid #c0cfe0; border-radius: 8px; font-size: 0.95em; margin-bottom: 12px; }
+  .closed-msg { text-align: center; background: white; border-radius: 16px; padding: 32px 24px; max-width: 400px; margin-top: 40px; color: #555; }
+  .closed-msg h2 { color: #1a3a5c; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Korean Politics</h1>
+  <h2>Episode 4 | November 24 – December 17</h2>
+  <h3>Game 5 of 18</h3>
+</div>
+
+<div id="closed-before" class="closed-msg" style="display:none">
+  <h2>Not Yet Open</h2>
+  <p>Episode 4 opens on November 24.</p>
+</div>
+
+<div id="closed-after" class="closed-msg" style="display:none">
+  <h2>This Episode Has Closed</h2>
+  <p>Episode 4 closed on December 17. Please check for the next episode.</p>
+</div>
+
+<div id="main-content" style="display:none; flex-direction:column; align-items:center; width:100%;">
+
+  <div class="overlay show" id="auth-overlay">
+    <div class="modal email-form">
+      <h2>Welcome!</h2>
+      <p>Enter your university email to begin.</p>
+      <input type="email" id="email-input" placeholder="your@email.com" />
+      <div id="auth-error" style="color:red;font-size:0.85em;margin-bottom:8px;display:none;">Email not recognized. Please try again.</div>
+      <button class="btn" onclick="checkEmail()">Start</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="penalty-overlay">
+    <div class="modal">
+      <h2>🔄 Not Quite!</h2>
+      <p>Going back one round. Try again!</p>
+      <button class="btn" onclick="dismissPenalty()">OK</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="round-complete-overlay">
+    <div class="modal">
+      <h2>✅ Round Complete!</h2>
+      <p id="round-complete-msg"></p>
+      <button class="btn" onclick="nextRound()">Continue</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="complete-overlay">
+    <div class="modal">
+      <h2>🎉 Episode 4 Complete!</h2>
+      <p>You have completed all games in Episode 1. Well done!</p>
+    </div>
+  </div>
+
+  <div class="progress" id="progress-text">Round 1 of 10</div>
+
+  <div class="game-area">
+    <div class="columns">
+      <div class="column" id="eng-col"></div>
+      <div class="column" id="kor-col"></div>
+    </div>
+  </div>
+
+  <button class="btn" id="check-btn" onclick="checkAnswers()" disabled>Check Answers</button>
+</div>
+
+<script>
+const SHEET_URL = "https://script.google.com/macros/s/AKfycbzxB42YBV1JHSaikSYrlY4u4PW1e_PckRG2XH0Y6pPpu53zNmNMXAfWowsV-YyHLEHo/exec";
+const EPISODE = 4;
+const GAME_NUMBER = 5;
+const OPEN_DATE = new Date("2026-11-24");
+const CLOSE_DATE = new Date("2026-12-17T23:59:59");
+const ROUNDS = [
+  [["different cultures","다양한 문화"], ["democratic","민주적인"], ["basic culture","기본적인 문화"], ["initially","처음에"]],
+  [["difficulty","어려움"], ["economic development","경제 발전"], ["become","되다"], ["argument","이론"]],
+  [["leave out","등한시"], ["important part","중요 부분"], ["political change","정치적 변화"], ["political group","정치적 그룹"]],
+  [["isolated","고립된"], ["approach","접근"], ["economic class","경제 계급"], ["main actor","주요 행위자"]],
+  [["different economic classes","다른 경제 계급"], ["fascist","파시스트"], ["Harvard professor","하버드 교수"], ["measure","측정"]],
+  [["beginning","초기"], ["role","역할"], ["production process","생산 프로세스"], ["peasant","농민"]],
+  [["strong capitalist class","강력한 자본주의 계급"], ["necessary","필요한"], ["economic base","경제적 기반"], ["independent of","~와 관계없이"]],
+  [["ruler","통치자"], ["limit","제약"], ["power of rulers","통치자의 권력"], ["democratic system","민주주의 시스템"]],
+  [["law","법률"], ["prevent","막다"], ["seize","압수"], ["private property","개인 재산"]],
+  [["fascism","파시즘"], ["Japan","일본"], ["Germany","독일"], ["weak","약한"]]
+];
+
+let currentRound = 0;
+let userEmail = "";
+let dragSrc = null;
+let filledDrops = {};
+
+function checkDates() {
+  const now = new Date();
+  if (now < OPEN_DATE) {
+    document.getElementById('closed-before').style.display = 'block';
+    return false;
+  }
+  if (now > CLOSE_DATE) {
+    document.getElementById('closed-after').style.display = 'block';
+    return false;
+  }
+  document.getElementById('main-content').style.display = 'flex';
+  return true;
+}
+
+function checkEmail() {
+  const input = document.getElementById('email-input').value.trim().toLowerCase();
+  const cb = 'cb_' + Date.now();
+  window[cb] = function(emails) {
+    const valid = emails.map(e => e.toLowerCase().trim());
+    if (valid.includes(input)) {
+      userEmail = input;
+      document.getElementById('auth-overlay').classList.remove('show');
+      loadRound(0);
+    } else {
+      document.getElementById('auth-error').style.display = 'block';
+    }
+    delete window[cb];
+    document.body.removeChild(script);
+  };
+  const script = document.createElement('script');
+  script.src = SHEET_URL + '?callback=' + cb;
+  document.body.appendChild(script);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  const input = document.getElementById('email-input');
+  if (input) input.addEventListener('keydown', function(e) { if (e.key === 'Enter') checkEmail(); });
+});
+
+function loadRound(idx) {
+  currentRound = idx;
+  filledDrops = {};
+  document.getElementById('progress-text').textContent = `Round ${idx+1} of ${ROUNDS.length}`;
+  document.getElementById('check-btn').disabled = true;
+
+  const pairs = ROUNDS[idx];
+  const engWords = pairs.map(p => p[0]);
+  const shuffledKor = [...pairs.map(p => p[1])];
+  for (let i = shuffledKor.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledKor[i], shuffledKor[j]] = [shuffledKor[j], shuffledKor[i]];
+  }
+
+  const engCol = document.getElementById('eng-col');
+  const korCol = document.getElementById('kor-col');
+  engCol.innerHTML = '';
+  korCol.innerHTML = '';
+
+  engWords.forEach((word) => {
+    const card = document.createElement('div');
+    card.className = 'word-card';
+    card.draggable = true;
+    card.textContent = word;
+    card.dataset.eng = word;
+    card.addEventListener('dragstart', onDragStart);
+    card.addEventListener('dragend', onDragEnd);
+    engCol.appendChild(card);
+  });
+
+  shuffledKor.forEach((word) => {
+    const dz = document.createElement('div');
+    dz.className = 'drop-zone';
+    dz.dataset.kor = word;
+    dz.textContent = word;
+    dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('over'); });
+    dz.addEventListener('dragleave', () => dz.classList.remove('over'));
+    dz.addEventListener('drop', onDrop);
+    korCol.appendChild(dz);
+  });
+}
+
+function onDragStart(e) {
+  dragSrc = e.currentTarget;
+  dragSrc.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragSrc.dataset.eng);
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  const dz = e.currentTarget;
+  dz.classList.remove('over');
+  if (!dragSrc) return;
+
+  const engWord = dragSrc.dataset.eng;
+  const korWord = dz.dataset.kor;
+
+  if (filledDrops[korWord]) {
+    returnToBank(filledDrops[korWord]);
+  }
+
+  const prevKor = dragSrc.dataset.currentDz;
+  if (prevKor && prevKor !== korWord) {
+    delete filledDrops[prevKor];
+    document.querySelectorAll('.drop-zone').forEach(z => {
+      if (z.dataset.kor === prevKor) {
+        z.classList.remove('filled');
+        z.textContent = prevKor;
+      }
+    });
+  }
+
+  filledDrops[korWord] = engWord;
+  dragSrc.dataset.currentDz = korWord;
+  dragSrc.style.display = 'none';
+  dz.classList.add('filled');
+  dz.textContent = korWord + ' ← ' + engWord;
+
+  checkAllFilled();
+  dragSrc = null;
+}
+
+function returnToBank(engWord) {
+  document.getElementById('eng-col').querySelectorAll('.word-card').forEach(card => {
+    if (card.dataset.eng === engWord) {
+      card.style.display = 'flex';
+      card.dataset.currentDz = '';
+    }
+  });
+}
+
+function checkAllFilled() {
+  const dzCount = document.querySelectorAll('.drop-zone').length;
+  const filled = Object.keys(filledDrops).length;
+  document.getElementById('check-btn').disabled = (filled < dzCount);
+}
+
+function checkAnswers() {
+  const pairs = ROUNDS[currentRound];
+  const correctMap = {};
+  pairs.forEach(p => correctMap[p[1]] = p[0]);
+
+  let allCorrect = true;
+  document.querySelectorAll('.drop-zone').forEach(dz => {
+    const kor = dz.dataset.kor;
+    const eng = filledDrops[kor];
+    if (eng === correctMap[kor]) {
+      dz.classList.add('correct');
+      document.querySelectorAll('.word-card').forEach(card => {
+        if (card.dataset.eng === eng) card.classList.add('correct');
+      });
+    } else {
+      dz.classList.add('incorrect');
+      allCorrect = false;
+    }
+  });
+
+  if (allCorrect) {
+    if (currentRound + 1 >= ROUNDS.length) {
+      sendResult('Complete');
+      setTimeout(() => {
+        window.location.href = 'kor-ep4-game6.html';
+      }, 800);
+    } else {
+      setTimeout(() => {
+        const msg = document.getElementById('round-complete-msg');
+        msg.textContent = `Round ${currentRound+1} done! On to round ${currentRound+2}.`;
+        document.getElementById('round-complete-overlay').classList.add('show');
+      }, 600);
+    }
+  } else {
+    setTimeout(() => {
+      document.getElementById('penalty-overlay').classList.add('show');
+    }, 600);
+  }
+}
+
+function nextRound() {
+  document.getElementById('round-complete-overlay').classList.remove('show');
+  loadRound(currentRound + 1);
+}
+
+function dismissPenalty() {
+  document.getElementById('penalty-overlay').classList.remove('show');
+  loadRound(Math.max(0, currentRound - 1));
+}
+
+function sendResult(status) {
+  const now = new Date();
+  fetch(SHEET_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      email: userEmail,
+      episode: EPISODE,
+      gameNumber: GAME_NUMBER,
+      date: now.toLocaleDateString(),
+      time: now.toLocaleTimeString(),
+      roundsCompleted: ROUNDS.length,
+      totalRounds: ROUNDS.length,
+      status: status
+    })
+  }).catch(err => console.error('Submit error:', err));
+}
+
+window.onload = function() {
+  checkDates();
+};
+</script>
+</body>
+</html>
