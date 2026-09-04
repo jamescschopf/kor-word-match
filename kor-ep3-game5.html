@@ -128,6 +128,7 @@ let currentRound = 0;
 let userEmail = "";
 let dragSrc = null;
 let filledDrops = {};
+let touchDragEl = null, touchClone = null, touchOffsetX = 0, touchOffsetY = 0;
 
 function checkDates() {
   const now = new Date();
@@ -190,11 +191,9 @@ function loadRound(idx) {
   engWords.forEach((word) => {
     const card = document.createElement('div');
     card.className = 'word-card';
-    card.draggable = true;
     card.textContent = word;
     card.dataset.eng = word;
-    card.addEventListener('dragstart', onDragStart);
-    card.addEventListener('dragend', onDragEnd);
+    addDragAndTouch(card);
     engCol.appendChild(card);
   });
 
@@ -210,6 +209,17 @@ function loadRound(idx) {
   });
 }
 
+function addDragAndTouch(card) {
+  // Mouse/desktop drag
+  card.draggable = true;
+  card.addEventListener('dragstart', onDragStart);
+  card.addEventListener('dragend', onDragEnd);
+  // Touch support for Android/Galaxy
+  card.addEventListener('touchstart', onTouchStart, {passive:false});
+  card.addEventListener('touchmove', onTouchMove, {passive:false});
+  card.addEventListener('touchend', onTouchEnd, {passive:false});
+}
+
 function onDragStart(e) {
   dragSrc = e.currentTarget;
   dragSrc.classList.add('dragging');
@@ -221,20 +231,77 @@ function onDragEnd(e) {
   e.currentTarget.classList.remove('dragging');
 }
 
+function onTouchStart(e) {
+  e.preventDefault();
+  touchDragEl = e.currentTarget;
+  const touch = e.touches[0];
+  const rect = touchDragEl.getBoundingClientRect();
+  touchOffsetX = touch.clientX - rect.left;
+  touchOffsetY = touch.clientY - rect.top;
+  // Create floating clone
+  touchClone = touchDragEl.cloneNode(true);
+  touchClone.style.position = 'fixed';
+  touchClone.style.width = rect.width + 'px';
+  touchClone.style.opacity = '0.8';
+  touchClone.style.zIndex = '9999';
+  touchClone.style.pointerEvents = 'none';
+  touchClone.style.left = (touch.clientX - touchOffsetX) + 'px';
+  touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+  document.body.appendChild(touchClone);
+  touchDragEl.style.opacity = '0.3';
+}
+
+function onTouchMove(e) {
+  e.preventDefault();
+  if (!touchClone) return;
+  const touch = e.touches[0];
+  touchClone.style.left = (touch.clientX - touchOffsetX) + 'px';
+  touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+  // Highlight drop zone under finger
+  document.querySelectorAll('.drop-zone').forEach(dz => dz.classList.remove('over'));
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const dz = el ? el.closest('.drop-zone') : null;
+  if (dz) dz.classList.add('over');
+}
+
+function onTouchEnd(e) {
+  e.preventDefault();
+  if (!touchClone || !touchDragEl) return;
+  const touch = e.changedTouches[0];
+  document.querySelectorAll('.drop-zone').forEach(dz => dz.classList.remove('over'));
+  // Find drop zone under finger
+  touchClone.style.display = 'none';
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  touchClone.style.display = '';
+  const dz = el ? el.closest('.drop-zone') : null;
+  if (dz) {
+    performDrop(touchDragEl, dz);
+  } else {
+    touchDragEl.style.opacity = '1';
+  }
+  document.body.removeChild(touchClone);
+  touchClone = null;
+  touchDragEl = null;
+}
+
 function onDrop(e) {
   e.preventDefault();
   const dz = e.currentTarget;
   dz.classList.remove('over');
   if (!dragSrc) return;
+  performDrop(dragSrc, dz);
+  dragSrc = null;
+}
 
-  const engWord = dragSrc.dataset.eng;
+function performDrop(card, dz) {
+  const engWord = card.dataset.eng;
   const korWord = dz.dataset.kor;
 
   if (filledDrops[korWord]) {
     returnToBank(filledDrops[korWord]);
   }
 
-  const prevKor = dragSrc.dataset.currentDz;
+  const prevKor = card.dataset.currentDz;
   if (prevKor && prevKor !== korWord) {
     delete filledDrops[prevKor];
     document.querySelectorAll('.drop-zone').forEach(z => {
@@ -246,19 +313,20 @@ function onDrop(e) {
   }
 
   filledDrops[korWord] = engWord;
-  dragSrc.dataset.currentDz = korWord;
-  dragSrc.style.display = 'none';
+  card.dataset.currentDz = korWord;
+  card.style.opacity = '0';
+  card.style.display = 'none';
   dz.classList.add('filled');
   dz.textContent = korWord + ' ← ' + engWord;
 
   checkAllFilled();
-  dragSrc = null;
 }
 
 function returnToBank(engWord) {
   document.getElementById('eng-col').querySelectorAll('.word-card').forEach(card => {
     if (card.dataset.eng === engWord) {
       card.style.display = 'flex';
+      card.style.opacity = '1';
       card.dataset.currentDz = '';
     }
   });
